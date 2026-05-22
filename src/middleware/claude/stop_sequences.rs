@@ -93,6 +93,8 @@ pub async fn apply_stop_sequences(resp: Response) -> Response {
         return resp;
     }
 
+    // === LibreR: preserve x-clewdr-* across response rebuild ===
+    let preserved = crate::middleware::claude::session_header::snapshot(resp.headers());
     let stream = resp.into_body().into_data_stream().eventsource();
     let stream = stop_stream(f.stop_sequences().to_owned(), stream);
     let mut resp = Sse::new(stream)
@@ -100,5 +102,6 @@ pub async fn apply_stop_sequences(resp: Response) -> Response {
         .into_response();
 
     resp.extensions_mut().insert(f);
+    crate::middleware::claude::session_header::restore(resp.headers_mut(), &preserved);
     resp
 }

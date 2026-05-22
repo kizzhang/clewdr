@@ -75,6 +75,8 @@ pub struct ClewdrConfig {
     pub no_fs: bool,
     #[serde(default)]
     pub log_to_file: bool,
+    #[serde(default)]
+    pub expose_session_headers: bool,
 
     // Network settings, can hot reload
     #[serde(default)]
@@ -166,6 +168,7 @@ impl Default for ClewdrConfig {
             custom_system: None,
             no_fs: false,
             log_to_file: false,
+            expose_session_headers: false,
         }
     }
 }

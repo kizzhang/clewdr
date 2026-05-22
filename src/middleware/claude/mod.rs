@@ -2,6 +2,7 @@ mod claude2oai;
 mod request;
 mod response;
 mod stop_sequences;
+pub mod session_header;
 
 pub(crate) use claude2oai::*;
 pub use request::*;

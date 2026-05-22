@@ -411,6 +411,10 @@ impl ClewdrCookie {
             self.inner.to_owned()
         }
     }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.inner
+    }
 }
 
 impl FromStr for ClewdrCookie {

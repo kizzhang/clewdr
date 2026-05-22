@@ -58,17 +58,25 @@ pub async fn to_oai(resp: Response) -> impl IntoResponse {
     if ClaudeApiFormat::Claude == cx.api_format() {
         return resp;
     }
+    // === LibreR: preserve x-clewdr-* across response rebuild ===
+    let preserved = crate::middleware::claude::session_header::snapshot(resp.headers());
     if !cx.is_stream() {
         match parse_response::<CreateMessageResponse>(resp).await {
-            Ok(response) => return Json(transforms_json(response)).into_response(),
+            Ok(response) => {
+                let mut r = Json(transforms_json(response)).into_response();
+                crate::middleware::claude::session_header::restore(r.headers_mut(), &preserved);
+                return r;
+            }
             Err(resp) => return resp,
         }
     }
     let stream = resp.into_body().into_data_stream().eventsource();
     let stream = transform_stream(stream);
-    Sse::new(stream)
+    let mut r = Sse::new(stream)
         .keep_alive(Default::default())
-        .into_response()
+        .into_response();
+    crate::middleware::claude::session_header::restore(r.headers_mut(), &preserved);
+    r
 }
 
 pub async fn add_usage_info(resp: Response) -> impl IntoResponse {
@@ -76,6 +84,8 @@ pub async fn add_usage_info(resp: Response) -> impl IntoResponse {
         return resp;
     };
     let (mut usage, stream) = (cx.usage().to_owned(), cx.is_stream());
+    // === LibreR: preserve x-clewdr-* across response rebuild ===
+    let preserved = crate::middleware::claude::session_header::snapshot(resp.headers());
     if !stream {
         let mut response = match parse_response::<CreateMessageResponse>(resp).await {
             Ok(response) => response,
@@ -84,7 +94,9 @@ pub async fn add_usage_info(resp: Response) -> impl IntoResponse {
         let output_tokens = response.count_tokens();
         usage.output_tokens = output_tokens;
         response.usage = Some(usage);
-        return Json(response).into_response();
+        let mut r = Json(response).into_response();
+        crate::middleware::claude::session_header::restore(r.headers_mut(), &preserved);
+        return r;
     }
     let stream = resp
         .into_body()
@@ -122,9 +134,11 @@ pub async fn add_usage_info(resp: Response) -> impl IntoResponse {
             }
         });
 
-    Sse::new(stream)
+    let mut r = Sse::new(stream)
         .keep_alive(Default::default())
-        .into_response()
+        .into_response();
+    crate::middleware::claude::session_header::restore(r.headers_mut(), &preserved);
+    r
 }
 
 pub async fn check_overloaded(mut resp: Response) -> Response {

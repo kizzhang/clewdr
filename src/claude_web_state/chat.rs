@@ -51,8 +51,23 @@ impl ClaudeWebState {
                 .instrument(info_span!("claude_web", "cookie" = cookie.cookie.ellipse()));
 
             match transform_res.await {
-                Ok(b) => {
-                    return Ok(b);
+                Ok(mut axum_resp) => {
+                    // === LibreR session-header injection (reads from , not ) ===
+                    if crate::config::CLEWDR_CONFIG.load().expose_session_headers {
+                        if let Some(conv) = state.conv_uuid.as_deref() {
+                            let hash = crate::middleware::claude::session_header::cookie_hash(&cookie.cookie);
+                            let h = axum_resp.headers_mut();
+                            use axum::http::HeaderValue;
+                            if let Ok(v) = HeaderValue::from_str(conv)  { h.insert("x-clewdr-conv-id",     v); }
+                            if let Ok(v) = HeaderValue::from_str(&hash) { h.insert("x-clewdr-cookie-hash", v); }
+                            if let Some(org) = state.org_uuid.as_deref() {
+                                if let Ok(v) = HeaderValue::from_str(org) { h.insert("x-clewdr-org-id", v); }
+                            }
+                        } else {
+                            tracing::warn!("session-header skipped: state.conv_uuid not set after send_chat");
+                        }
+                    }
+                    return Ok(axum_resp);
                 }
                 Err(e) => {
                     error!("{e}");
