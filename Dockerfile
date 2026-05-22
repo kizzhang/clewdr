@@ -2,7 +2,7 @@ FROM node:lts-slim AS frontend-builder
 WORKDIR /build/frontend
 RUN npm install -g pnpm
 COPY frontend/ .
-RUN pnpm install && pnpm run build
+RUN pnpm install --config.dangerouslyAllowAllBuilds=true && pnpm run build
 
 FROM docker.io/lukemathwalker/cargo-chef:latest-rust-trixie AS chef
 WORKDIR /build
